@@ -1,7 +1,9 @@
+
 param(
     [Parameter(Mandatory=$true)]
     [hashtable]$ADUsers
 )
+
 # Import active directory module for running AD cmdlets
 Import-Module ActiveDirectory
 
@@ -25,43 +27,46 @@ public class PasswordGenerator
 }
 "@
 
-
 # Define UPN
 $UPN = "HuttoTX.gov"
 
 # Define the group(s) to add users to
 $groups = "Hutto Users", "Employees"
 
-# Loop through each row containing user details in the CSV file
-foreach ($User in $ADUsers) {
+# Define the group(s) to add users to based on department
+$DepartmentGroups = @{
+    "IT" = "IT Users"
+    "HR" = "HR Users"
+    # Add more department-group mappings as needed
+}
 
-    #Read user data from each field in each row and assign the data to a variable as below
+# Loop through each row containing user details in the CSV file
+foreach ($User in $ADUsers.Values) {
+    # Read user data from each field in each row and assign the data to a variable as below
     $username = $User.username
     $firstname = $User.legalfirstname
     $lastname = $User.legallastname
     $pfirstname = $User.prefferedfirstname
-	$plastname = $User.prefferedlastname
+    $plastname = $User.prefferedlastname
     $OU = $User.ou #This field refers to the OU the user account is to be created in
     $email = $User.email
     $jobtitle = $User.primarytitle
     $company = $User.company
     $department = $User.department
     $description = $User.description
-    $manager= $User.manager
-    $homepath="\\FS3\Home\"
-    $mslicense=$User.licensegroup
+    $manager = $User.manager
+    $homepath = "\\FS3\Home\"
+    $mslicense = $User.licensegroup
 
     # Generate a password for the user
     $password = [PasswordGenerator]::GeneratePassword()
 
     # Check to see if the user already exists in AD
     if (Get-ADUser -Filter "SamAccountName -eq '$username'") {
-        
         # If user does exist, give a warning
         Write-Warning "A user account with username $username already exists in Active Directory."
     }
     else {
-
         # User does not exist then proceed to create the new user account
         # Account will be created in the OU provided by the $OU variable read from the CSV file
         New-ADUser `
@@ -79,8 +84,8 @@ foreach ($User in $ADUsers) {
             -Department $department `
             -Manager $manager `
             -Description $description `
-			-homeDrive "H:" `
-			-homeDirectory "$homepath$username" `
+            -homeDrive "H:" `
+            -homeDirectory "$homepath$username" `
             -AccountPassword (ConvertTo-SecureString -AsPlainText $password -Force) `
             -ChangePasswordAtLogon $False
 
@@ -95,15 +100,21 @@ foreach ($User in $ADUsers) {
         # Add the user to the group specified by the $mslicense variable
         Add-ADGroupMember -Identity $mslicense -Members $username
 
-         #Check if the user exists
-		$userExists = Get-ADUser -Filter { SamAccountName -eq $username } -Properties DisplayName, Manager
-		if ($userExists) {
-			$DisplayName = $userExists.DisplayName
-			$manager = (Get-ADUser $userExists.Manager -Properties EmailAddress).EmailAddress
+        # Add user to additional groups based on department
+        if ($DepartmentGroups.ContainsKey($department)) {
+            $departmentGroup = $DepartmentGroups[$department]
+            Add-ADGroupMember -Identity $departmentGroup -Members $username
+        }
 
-			if ($DisplayName -and $manager) {
-        $subject = "New User Onboarded: $DisplayName"
-        $body = 
+        #Check if the user exists
+        $userExists = Get-ADUser -Filter { SamAccountName -eq $username } -Properties DisplayName, Manager
+        if ($userExists) {
+            $DisplayName = $userExists.DisplayName
+            $manager = (Get-ADUser $userExists.Manager -Properties EmailAddress).EmailAddress
+
+            if ($DisplayName -and $manager) {
+                $subject = "New User Onboarded: $DisplayName"
+                $body = 
 @"
 <html>
 <body>
@@ -114,17 +125,16 @@ foreach ($User in $ADUsers) {
 </html>
 "@
 
-        $cc = "itnotifications@huttotx.gov"
-        Send-MailMessage -To $manager -From "itnotifications@huttotx.gov" -CC $cc -Subject $subject -Body $body -BodyAsHTML -SmtpServer "HUTTO-EXCH-01.HuttoTX.gov"
-	}
-    else {
-        Write-Output "Display Name or Manager's Email Address is not set for user $username."
-    }
-}
-else {
-    Write-Output "User $username does not exist."
-}
-
+                $cc = "itnotifications@huttotx.gov"
+                Send-MailMessage -To $manager -From "itnotifications@huttotx.gov" -CC $cc -Subject $subject -Body $body -BodyAsHTML -SmtpServer "HUTTO-EXCH-01.HuttoTX.gov"
+            }
+            else {
+                Write-Output "Display Name or Manager's Email Address is not set for user $username."
+            }
+        }
+        else {
+            Write-Output "User $username does not exist."
+        }
     }
 }
 
