@@ -34,11 +34,11 @@ $UPN = "HuttoTX.gov"
 $groups = "Hutto Users", "Employees"
 
 # Define the group(s) to add users to based on department
-$DepartmentGroups = @{
-    "IT" = "IT Users"
-    "HR" = "HR Users"
-    # Add more department-group mappings as needed
-}
+# Changed to dynamic hastable
+$DepartmentGroups = @{}
+$DepartmentGroups["IT"] = @("IT Users", "IT Admins", "Another IT Group")
+$DepartmentGroups["HR"] = @("HR Users", "Another HR Group")
+# Add more departments and associated groups as needed
 
 # Loop through each row containing user details in the CSV file
 foreach ($User in $ADUsers) {
