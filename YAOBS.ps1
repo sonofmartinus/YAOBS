@@ -1,0 +1,195 @@
+param(
+    [Parameter(Mandatory=$true)]
+    [hashtable]$ADUsers
+)
+# Import active directory module for running AD cmdlets
+Import-Module ActiveDirectory
+
+Add-Type -TypeDefinition @"
+using System;
+
+public class PasswordGenerator
+{
+    private static string[] animals = new string[] { "lion", "tiger", "bear", "wolf", "fox", "eagle", "hawk", "shark", "whale", "dolphin", "elephant", "giraffe", "zebra", "hippo", "rhino", "penguin", "koala", "kangaroo", "panda", "monkey", "gorilla", "leopard", "cheetah", "crocodile", "platypus" };
+    private static string[] places = new string[] { "river", "park", "forest", "desert", "mountain", "valley", "ocean", "beach", "city", "village", "island", "peninsula", "canyon", "lake", "pond", "swamp", "jungle", "savannah", "tundra", "hill", "plain", "cave", "cliff", "volcano", "waterfall" };
+    private static Random random = new Random();
+
+    public static string GeneratePassword()
+    {
+        string animal = animals[random.Next(animals.Length)];
+        string place = places[random.Next(places.Length)];
+        int number = random.Next(100);  // Generate a random number less than 100
+
+        return animal + '.' + place + number.ToString();
+    }
+}
+"@
+
+# Import the .NET class needed for generating password
+#Add-Type -TypeDefinition @"
+#using System;
+#using System.Security.Cryptography;
+#using System.Text;
+#
+#public class PasswordGenerator
+#{
+#    private static string[] animals = new string[] { "lion", "tiger", "bear", "wolf", "fox", "eagle", "hawk", "shark", "whale", "dolphin", "elephant", "giraffe", "zebra", "hippo", "rhino", "penguin", "koala", "kangaroo", "panda", "monkey", "gorilla", "leopard", "cheetah", "crocodile", "platypus" };
+#    private static string[] places = new string[] { "river", "park", "forest", "desert", "mountain", "valley", "ocean", "beach", "city", "village", "island", "peninsula", "canyon", "lake", "pond", "swamp", "jungle", "savannah", "tundra", "hill", "plain", "cave", "cliff", "volcano", "waterfall" };
+#
+#    public static string GeneratePassword()
+#    {
+#        using (RNGCryptoServiceProvider provider = new RNGCryptoServiceProvider())
+#        {
+#            string animal = animals[GetInt(provider, animals.Length)];
+#            string place = places[GetInt(provider, places.Length)];
+#            int number = GetInt(provider, 100);  // Generate a random number less than 100
+#
+#            return animal + '.' + place + number.ToString();
+#        }
+#    }
+#
+#    private static int GetInt(RNGCryptoServiceProvider provider, int max)
+#        {
+#            byte[] box = new byte[1];
+#            do provider.GetBytes(box);
+#            while (!(box[0] < max * (Byte.MaxValue / (max + 1))));
+#            return box[0];
+#        }
+#
+#}
+#"@
+
+# Store the data from NewUsersFinal.csv in the $ADUsers variable
+#$ADUsers = Import-Csv D:\Powershell\csv\userimport.csv -Delimiter ","
+
+
+# Define UPN
+$UPN = "HuttoTX.gov"
+
+# Define the group(s) to add users to
+$groups = "Hutto Users", "Employees"
+
+# Loop through each row containing user details in the CSV file
+foreach ($User in $ADUsers) {
+
+    #Read user data from each field in each row and assign the data to a variable as below
+    $username = $User.username
+    $firstname = $User.legalfirstname
+    $lastname = $User.legallastname
+    $pfirstname = $User.prefferedfirstname
+	$plastname = $User.prefferedlastname
+    $OU = $User.ou #This field refers to the OU the user account is to be created in
+    $email = $User.email
+    $jobtitle = $User.primarytitle
+    $company = $User.company
+    $department = $User.department
+    $description = $User.description
+    $manager= $User.manager
+    $homepath="\\FS3\Home\"
+    $mslicense=$User.licensegroup
+
+    # Generate a password for the user
+    $password = [PasswordGenerator]::GeneratePassword()
+
+    # Check to see if the user already exists in AD
+    if (Get-ADUser -Filter "SamAccountName -eq '$username'") {
+        
+        # If user does exist, give a warning
+        Write-Warning "A user account with username $username already exists in Active Directory."
+    }
+    else {
+
+        # User does not exist then proceed to create the new user account
+        # Account will be created in the OU provided by the $OU variable read from the CSV file
+        New-ADUser `
+            -SamAccountName $username `
+            -UserPrincipalName "$username@$UPN" `
+            -Name "$firstname $lastname" `
+            -GivenName $firstname `
+            -Surname $lastname `
+            -Enabled $True `
+            -DisplayName "$pfirstname $plastname" `
+            -Path $OU `
+            -Company $company `
+            -EmailAddress $email `
+            -Title $jobtitle `
+            -Department $department `
+            -Manager $manager `
+            -Description $description `
+			-homeDrive "H:" `
+			-homeDirectory "$homepath$username" `
+            -AccountPassword (ConvertTo-SecureString -AsPlainText $password -Force) `
+            -ChangePasswordAtLogon $False
+
+        # If user is created, show message.
+        Write-Host "The user account $username is created." -ForegroundColor Cyan
+
+        # Add the user to the specified groups
+        foreach ($group in $groups) {
+            Add-ADGroupMember -Identity $group -Members $username
+        }
+
+        # Add the user to the group specified by the $mslicense variable
+        Add-ADGroupMember -Identity $mslicense -Members $username
+
+         #Check if the user exists
+		$userExists = Get-ADUser -Filter { SamAccountName -eq $username } -Properties DisplayName, Manager
+		if ($userExists) {
+			$DisplayName = $userExists.DisplayName
+			$manager = (Get-ADUser $userExists.Manager -Properties EmailAddress).EmailAddress
+
+			if ($DisplayName -and $manager) {
+        $subject = "New User Onboarded: $DisplayName"
+        $body = 
+@"
+<html>
+<body>
+<p>A new user <b>$DisplayName</b> has been onboarded, their username is: <b>$username</b>.</p>
+<p>Their temporary network password is: <b>$password</b></p>
+<p style='color:red; font-style:italic;'>#Do not reply to this email message as it is only informational, we are not requesting any further action or information from you at this time.</p>
+</body>
+</html>
+"@
+
+        $cc = "itnotifications@huttotx.gov"
+        Send-MailMessage -To $manager -From "itnotifications@huttotx.gov" -CC $cc -Subject $subject -Body $body -BodyAsHTML -SmtpServer "HUTTO-EXCH-01.HuttoTX.gov"
+	}
+    else {
+        Write-Output "Display Name or Manager's Email Address is not set for user $username."
+    }
+}
+else {
+    Write-Output "User $username does not exist."
+}
+
+    }
+}
+
+Read-Host -Prompt "Press Enter to exit"
+
+#        # Email the password to the manager
+#        $userExists = Get-ADUser -Filter { SamAccountName -eq $username }
+#        if ($userExists) {
+#        $DisplayName = $userExists.DisplayName
+#        $subject = "New User Onboarded: $DisplayName"
+#        $body = 
+#@"
+#<html>
+#<body>
+#<p>A new user <b>$DisplayName</b> has been onboarded, their username is: <b>$username</b>.</p>
+#<p>Their temporary network password is: <b>$password</b>.</p>
+#<p style='color:red; font-style:italic;'>#Do not reply to this email message as it is only informational, we are not requesting any further action or information from you at this time.</p>
+#</body>
+#</html>
+#"@
+#
+#		$cc = "itnotifications@huttotx.gov"
+#        Send-MailMessage -To $manager -From "itnotifications@huttotx.gov" -CC $cc -Subject $subject -Body $body -BodyAsHTML -SmtpServer "HUTTO-EXCH-01.HuttoTX.gov"
+#        }
+#        else {
+#    Write-Output "User $username does not exist."
+#        }
+#    }
+#}
+#
+#Read-Host -Prompt "Press Enter to exit"
