@@ -25,43 +25,6 @@ public class PasswordGenerator
 }
 "@
 
-# Import the .NET class needed for generating password
-#Add-Type -TypeDefinition @"
-#using System;
-#using System.Security.Cryptography;
-#using System.Text;
-#
-#public class PasswordGenerator
-#{
-#    private static string[] animals = new string[] { "lion", "tiger", "bear", "wolf", "fox", "eagle", "hawk", "shark", "whale", "dolphin", "elephant", "giraffe", "zebra", "hippo", "rhino", "penguin", "koala", "kangaroo", "panda", "monkey", "gorilla", "leopard", "cheetah", "crocodile", "platypus" };
-#    private static string[] places = new string[] { "river", "park", "forest", "desert", "mountain", "valley", "ocean", "beach", "city", "village", "island", "peninsula", "canyon", "lake", "pond", "swamp", "jungle", "savannah", "tundra", "hill", "plain", "cave", "cliff", "volcano", "waterfall" };
-#
-#    public static string GeneratePassword()
-#    {
-#        using (RNGCryptoServiceProvider provider = new RNGCryptoServiceProvider())
-#        {
-#            string animal = animals[GetInt(provider, animals.Length)];
-#            string place = places[GetInt(provider, places.Length)];
-#            int number = GetInt(provider, 100);  // Generate a random number less than 100
-#
-#            return animal + '.' + place + number.ToString();
-#        }
-#    }
-#
-#    private static int GetInt(RNGCryptoServiceProvider provider, int max)
-#        {
-#            byte[] box = new byte[1];
-#            do provider.GetBytes(box);
-#            while (!(box[0] < max * (Byte.MaxValue / (max + 1))));
-#            return box[0];
-#        }
-#
-#}
-#"@
-
-# Store the data from NewUsersFinal.csv in the $ADUsers variable
-#$ADUsers = Import-Csv D:\Powershell\csv\userimport.csv -Delimiter ","
-
 
 # Define UPN
 $UPN = "HuttoTX.gov"
@@ -166,30 +129,3 @@ else {
 }
 
 Read-Host -Prompt "Press Enter to exit"
-
-#        # Email the password to the manager
-#        $userExists = Get-ADUser -Filter { SamAccountName -eq $username }
-#        if ($userExists) {
-#        $DisplayName = $userExists.DisplayName
-#        $subject = "New User Onboarded: $DisplayName"
-#        $body = 
-#@"
-#<html>
-#<body>
-#<p>A new user <b>$DisplayName</b> has been onboarded, their username is: <b>$username</b>.</p>
-#<p>Their temporary network password is: <b>$password</b>.</p>
-#<p style='color:red; font-style:italic;'>#Do not reply to this email message as it is only informational, we are not requesting any further action or information from you at this time.</p>
-#</body>
-#</html>
-#"@
-#
-#		$cc = "itnotifications@huttotx.gov"
-#        Send-MailMessage -To $manager -From "itnotifications@huttotx.gov" -CC $cc -Subject $subject -Body $body -BodyAsHTML -SmtpServer "HUTTO-EXCH-01.HuttoTX.gov"
-#        }
-#        else {
-#    Write-Output "User $username does not exist."
-#        }
-#    }
-#}
-#
-#Read-Host -Prompt "Press Enter to exit"
