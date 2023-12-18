@@ -41,7 +41,7 @@ $DepartmentGroups = @{
 }
 
 # Loop through each row containing user details in the CSV file
-foreach ($User in $ADUsers.Values) {
+foreach ($User in $ADUsers) {
     # Read user data from each field in each row and assign the data to a variable as below
     $username = $User.username
     $firstname = $User.legalfirstname
