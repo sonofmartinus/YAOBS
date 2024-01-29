@@ -1,4 +1,27 @@
+<#
+.SYNOPSIS
+	Yet Another On Board Script
 
+.DESCRIPTION
+	This script will make an API request to https://makemeapassword.ligos.net/api and acquire a passphrase using their API. Passphrase
+	parameters are preset for this URI.
+
+.EXAMPLE
+	.\Get-RandomPassword.ps1 in console
+	Then call function Get-RandomPassword
+
+.EXAMPLE
+
+
+.NOTES
+	Version:        0.0.1
+	Author:         Richard Martinez
+	Blog:			https://sonofmartinus.com
+	Creation Date:  1/1/24
+
+.LINK
+
+#>
 param(
     [Parameter(Mandatory=$true)]
     [hashtable]$ADUsers
@@ -28,10 +51,10 @@ public class PasswordGenerator
 "@
 
 # Define UPN
-$UPN = "HuttoTX.gov"
+$UPN = "UPN"
 
 # Define the group(s) to add users to
-$groups = "Hutto Users", "Employees"
+$groups = "Users", "Employees"
 
 # Define the group(s) to add users to based on department
 # Changed to dynamic hastable
@@ -55,7 +78,7 @@ foreach ($User in $ADUsers) {
     $department = $User.department
     $description = $User.description
     $manager = $User.manager
-    $homepath = "\\FS3\Home\"
+    $homepath = ""
     $mslicense = $User.licensegroup
 
     # Generate a password for the user
@@ -114,7 +137,7 @@ foreach ($User in $ADUsers) {
 
             if ($DisplayName -and $manager) {
                 $subject = "New User Onboarded: $DisplayName"
-                $body = 
+                $body =
 @"
 <html>
 <body>
@@ -125,8 +148,8 @@ foreach ($User in $ADUsers) {
 </html>
 "@
 
-                $cc = "itnotifications@huttotx.gov"
-                Send-MailMessage -To $manager -From "itnotifications@huttotx.gov" -CC $cc -Subject $subject -Body $body -BodyAsHTML -SmtpServer "HUTTO-EXCH-01.HuttoTX.gov"
+                $cc = "email"
+                Send-MailMessage -To $manager -From "email" -CC $cc -Subject $subject -Body $body -BodyAsHTML -SmtpServer "Server"
             }
             else {
                 Write-Output "Display Name or Manager's Email Address is not set for user $username."
