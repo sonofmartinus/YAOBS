@@ -3,8 +3,7 @@
 	Yet Another On Board Script
 
 .DESCRIPTION
-	This script will make an API request to https://makemeapassword.ligos.net/api and acquire a passphrase using their API. Passphrase
-	parameters are preset for this URI.
+	This is a on-prem AD onboarding script. That creates user account and adds to necessary groups and then emails their manager.
 
 .EXAMPLE
 	.\Get-RandomPassword.ps1 in console
@@ -22,10 +21,26 @@
 .LINK
 
 #>
+Import-Module .\Send-MailToManager\Send-MailToManager.ps1
+
 param(
     [Parameter(Mandatory=$true)]
     [hashtable]$ADUsers
 )
+
+#Mail parameters to pass to Send-MailMessage function
+$htmlTemplatePath = "$home\Documents\PowerShell"
+$mailParams = @{
+    SmtpServer                 = 'server'
+    Port                       = '25'
+    UseSSL                     =  $true
+    From                       =  $from
+    To                         =  $manager
+	CC                         =  $cc
+    Subject                    = "New User Onboarded: $DisplayName"
+    Body                       =  Get-Content -Path $htmlTemplatePath | Out-String
+    DeliveryNotificationOption = 'OnFailure', 'OnSuccess'
+}
 
 # Import active directory module for running AD cmdlets
 Import-Module ActiveDirectory
@@ -51,7 +66,7 @@ public class PasswordGenerator
 "@
 
 # Define UPN
-$UPN = "UPN"
+$domainName = (Get-ADDomain).Name
 
 # Define the group(s) to add users to
 $groups = "Users", "Employees"
@@ -94,7 +109,7 @@ foreach ($User in $ADUsers) {
         # Account will be created in the OU provided by the $OU variable read from the CSV file
         New-ADUser `
             -SamAccountName $username `
-            -UserPrincipalName "$username@$UPN" `
+            -UserPrincipalName "$username@$domainName" `
             -Name "$firstname $lastname" `
             -GivenName $firstname `
             -Surname $lastname `
