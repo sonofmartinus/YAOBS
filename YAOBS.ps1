@@ -6,14 +6,13 @@
 	This is a on-prem AD onboarding script. That creates user account and adds to necessary groups and then emails their manager.
 
 .EXAMPLE
-	.\Get-RandomPassword.ps1 in console
-	Then call function Get-RandomPassword
+
 
 .EXAMPLE
 
 
 .NOTES
-	Version:        0.0.1
+	Version:        0.0.2
 	Author:         Richard Martinez
 	Blog:			https://sonofmartinus.com
 	Creation Date:  1/1/24
@@ -21,17 +20,29 @@
 .LINK
 
 #>
-Import-Module .\Send-MailToManager\Send-MailToManager.ps1
+Import-Module "$PSScriptRoot\Send-MailToManager\Send-MailToManager.ps1"
+Import-Module "$PSScriptRoot\Get-RandomPassword\Get-RandomPassword.ps1"
 
 param(
     [Parameter(Mandatory=$true)]
-    [hashtable]$ADUsers
+    [hashtable]$ADUsers,
+	[Parameter()]
+	[string]$adminUPN
 )
 
+#Get MOERA from Environment
+if ($PSBoundParameters.ContainsKey('adminUPN')){
+	Connect-ExchangeOnline -UserPrincipalName $adminUPN
+}
+else {
+	Connect-ExchangeOnline
+}
+$moera = Get-AcceptedDomain | Select-Object Name,DomainType
+
 #Mail parameters to pass to Send-MailMessage function
-$htmlTemplatePath = "$home\Documents\PowerShell"
+$htmlTemplatePath = "$PSScriptRoot\template.html"
 $mailParams = @{
-    SmtpServer                 = 'server'
+    SmtpServer                 =  $moera
     Port                       = '25'
     UseSSL                     =  $true
     From                       =  $from
@@ -73,11 +84,17 @@ $groups = "Users", "Employees"
 
 # Define the group(s) to add users to based on department
 # Changed to dynamic hastable
+# Add more departments and associated groups as needed
 $DepartmentGroups = @{}
 $DepartmentGroups["IT"] = @("IT Users", "IT Admins", "Another IT Group")
 $DepartmentGroups["HR"] = @("HR Users", "Another HR Group")
-# Add more departments and associated groups as needed
+#Define hash with OU's for each specific department
+$DepartmentOUs = @{}
+$DepartmentOUs = ["IT"] = @("")
 
+if ($DepartmentOUs.ContainsKey($department)){
+	$departmentOU = $departmentOUs[$department]
+}
 # Loop through each row containing user details in the CSV file
 foreach ($User in $ADUsers) {
     # Read user data from each field in each row and assign the data to a variable as below
@@ -86,7 +103,7 @@ foreach ($User in $ADUsers) {
     $lastname = $User.legallastname
     $pfirstname = $User.prefferedfirstname
     $plastname = $User.prefferedlastname
-    $OU = $User.ou #This field refers to the OU the user account is to be created in
+    #$OU = $User.ou #This field refers to the OU the user account is to be created in
     $email = $User.email
     $jobtitle = $User.primarytitle
     $company = $User.company
@@ -97,7 +114,8 @@ foreach ($User in $ADUsers) {
     $mslicense = $User.licensegroup
 
     # Generate a password for the user
-    $password = [PasswordGenerator]::GeneratePassword()
+    #$password = [PasswordGenerator]::GeneratePassword()
+	$password = Get-RandomPassword
 
     # Check to see if the user already exists in AD
     if (Get-ADUser -Filter "SamAccountName -eq '$username'") {
@@ -115,7 +133,7 @@ foreach ($User in $ADUsers) {
             -Surname $lastname `
             -Enabled $True `
             -DisplayName "$pfirstname $plastname" `
-            -Path $OU `
+            -Path $departmentOU `
             -Company $company `
             -EmailAddress $email `
             -Title $jobtitle `
@@ -151,20 +169,7 @@ foreach ($User in $ADUsers) {
             $manager = (Get-ADUser $userExists.Manager -Properties EmailAddress).EmailAddress
 
             if ($DisplayName -and $manager) {
-                $subject = "New User Onboarded: $DisplayName"
-                $body =
-@"
-<html>
-<body>
-<p>A new user <b>$DisplayName</b> has been onboarded, their username is: <b>$username</b>.</p>
-<p>Their temporary network password is: <b>$password</b></p>
-<p style='color:red; font-style:italic;'>#Do not reply to this email message as it is only informational, we are not requesting any further action or information from you at this time.</p>
-</body>
-</html>
-"@
-
-                $cc = "email"
-                Send-MailMessage -To $manager -From "email" -CC $cc -Subject $subject -Body $body -BodyAsHTML -SmtpServer "Server"
+                Send-MailToManager $mailParams
             }
             else {
                 Write-Output "Display Name or Manager's Email Address is not set for user $username."

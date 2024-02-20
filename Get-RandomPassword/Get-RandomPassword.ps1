@@ -14,7 +14,7 @@
 
 
 .NOTES
-	Version:        0.0.1
+	Version:        0.0.2
 	Author:         Richard Martinez
 	Blog:			https://sonofmartinus.com
 	Creation Date:  1/27/24
@@ -48,10 +48,10 @@ foreach ($key in $uriFlags.Keys) {
 }
 
 	#Construct URI
-	$modifiedUri = $baseUri
+	$modifiedURI = $baseURI
 	if ($queryParams.Length -gt 0) {
     $queryString = $queryParams -join "&"
-    $modifiedUri += "?$queryString"
+    $modifiedURI += "?$queryString"
 	}
 
 	elseif ($null -eq $modifiedURI) {
