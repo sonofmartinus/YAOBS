@@ -90,7 +90,7 @@ $DepartmentGroups["IT"] = @("IT Users", "IT Admins", "Another IT Group")
 $DepartmentGroups["HR"] = @("HR Users", "Another HR Group")
 #Define hash with OU's for each specific department
 $DepartmentOUs = @{}
-$DepartmentOUs = ["IT"] = @("")
+$DepartmentOUs["IT"] = @("OU=")
 
 if ($DepartmentOUs.ContainsKey($department)){
 	$departmentOU = $departmentOUs[$department]
