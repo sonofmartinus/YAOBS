@@ -12,7 +12,7 @@
 
 
 .NOTES
-	Version:        0.0.2
+	Version:        0.0.3
 	Author:         Richard Martinez
 	Blog:			https://sonofmartinus.com
 	Creation Date:  1/1/24
@@ -82,19 +82,19 @@ $domainName = (Get-ADDomain).Name
 # Define the group(s) to add users to
 $groups = "Users", "Employees"
 
-# Define the group(s) to add users to based on department
-# Changed to dynamic hastable
-# Add more departments and associated groups as needed
+#Define hash with department key which will make sure users are added to proper security/distribution groups based on their department
 $DepartmentGroups = @{}
 $DepartmentGroups["IT"] = @("IT Users", "IT Admins", "Another IT Group")
 $DepartmentGroups["HR"] = @("HR Users", "Another HR Group")
+
 #Define hash with OU's for each specific department
 $DepartmentOUs = @{}
 $DepartmentOUs["IT"] = @("OU=")
+$DepartmentOUs["HR"] = @("OU=")
+$DepartmentOUs["Finance"] = @("OU=")
+$DepartmentOUs["Marketing"] = @("OU=")
 
-if ($DepartmentOUs.ContainsKey($department)){
-	$departmentOU = $departmentOUs[$department]
-}
+
 # Loop through each row containing user details in the CSV file
 foreach ($User in $ADUsers) {
     # Read user data from each field in each row and assign the data to a variable as below
@@ -103,19 +103,21 @@ foreach ($User in $ADUsers) {
     $lastname = $User.legallastname
     $pfirstname = $User.prefferedfirstname
     $plastname = $User.prefferedlastname
-    #$OU = $User.ou #This field refers to the OU the user account is to be created in
     $email = $User.email
     $jobtitle = $User.primarytitle
     $company = $User.company
     $department = $User.department
     $description = $User.description
     $manager = $User.manager
-    $homepath = ""
-    $mslicense = $User.licensegroup
 
     # Generate a password for the user
     #$password = [PasswordGenerator]::GeneratePassword()
 	$password = Get-RandomPassword
+
+	# Set user OU based on user department
+	if ($DepartmentOUs.ContainsKey($department)){
+		$departmentOU = $departmentOUs[$department]
+	}
 
     # Check to see if the user already exists in AD
     if (Get-ADUser -Filter "SamAccountName -eq '$username'") {
@@ -140,8 +142,6 @@ foreach ($User in $ADUsers) {
             -Department $department `
             -Manager $manager `
             -Description $description `
-            -homeDrive "H:" `
-            -homeDirectory "$homepath$username" `
             -AccountPassword (ConvertTo-SecureString -AsPlainText $password -Force) `
             -ChangePasswordAtLogon $False
 
@@ -152,9 +152,6 @@ foreach ($User in $ADUsers) {
         foreach ($group in $groups) {
             Add-ADGroupMember -Identity $group -Members $username
         }
-
-        # Add the user to the group specified by the $mslicense variable
-        Add-ADGroupMember -Identity $mslicense -Members $username
 
         # Add user to additional groups based on department
         if ($DepartmentGroups.ContainsKey($department)) {

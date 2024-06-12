@@ -23,17 +23,24 @@
 
 #>
 
+[CmdletBinding()]
+param (
+	[Parameter()]
+	[switch[]]$wc = @("wc", "2"),
+	[Parameter()]
+	[switch]$pc
+)
 #Configure API options for passphrase
 #baseURI will fetch a passphrase with defaults, to see applicable setings go to: https://makemeapassword.ligos.net/Api
 $baseURI = "https://makemeapassword.ligos.net/api/v1/passphrase/plain"
 #Configure URI flags
 #Array, first value is boleaan to trigger if, second value is flag for passphrase configuration, thrid value is for integer value
 $uriFlags = @{}
-$uriFlags["wc"] = @($true, "wc", "2")
-$uriFlags["pc"] = @($true, "pc", "1")
-$uriFlags["sp"] = @($true, "sp", "t")
-$uriFlags["minCh"] = @($true, "minCh", "20")
-$uriFlags["whenNum"] = @($true, "whenNum", "Anywhere")
+$uriFlags["wc"] = $wc # wc - Word Count | range 1-16
+$uriFlags["pc"] = @($true, "pc", "1") # pc - Count of passphrases | range 1-50
+$uriFlags["sp"] = @($true, "sp", "t") # sp - Include space between words | boolean
+$uriFlags["minCh"] = @($true, "minCh", "20") # minCH - Minimum Character length | 1-9999
+$uriFlags["whenNum"] = @($true, "whenNum", "Anywhere") # whenNum - Where to add number - Never | StartOfWord | EndOfWord | StartOrEndOfWord | EndOfPhrase | Anywhere
 $uriFlags["nums"] = @($true, "nums", "1")
 $uriFlags["whenUp"] = @($true, "whenUp", "Anywhere")
 $uriFlags["ups"] = @($true, "ups", "1")
